@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans:
+    "Pretendard Variable", "Pretendard JP Variable", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Noto Sans JP", "Malgun Gothic", sans-serif;
+  --font-jp:
+    "Pretendard JP Variable", "Pretendard Variable", -apple-system, BlinkMacSystemFont,
+    "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  --color-page: var(--background);
+  --color-surface: var(--surface);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+}
+
+:root {
+  color-scheme: dark;
+  --background: #181818;
+  --surface: #202020;
+  --field: #1a1a1a;
+  --line: #333333;
+  --line-strong: #484848;
+  --foreground: #f3f0f7;
+  --muted: #b3afb9;
+  --subtle: #96919f;
+  --accent: #c8b4f0;
+  --accent-hover: #d8c8f7;
+  --accent-soft: #c8b4f00d;
+  --danger: #f4a5ac;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  font-family: var(--font-sans);
+  letter-spacing: -0.015em;
+}
+
+:lang(ja) {
+  font-family: var(--font-jp);
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--background);
+}
+
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-3xl px-5 sm:px-8;
+  }
+  .text-link {
+    @apply text-muted transition-colors hover:text-accent;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-surface p-5 sm:p-7;
+  }
+  .field {
+    @apply w-full rounded-xl border border-line-strong bg-field px-4 py-3 text-base leading-7 text-foreground transition-colors placeholder:text-subtle hover:enabled:border-muted focus:border-accent focus-visible:outline-offset-2 disabled:opacity-60;
+  }
+  .button {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-page transition-colors hover:enabled:bg-accent-hover disabled:opacity-40;
+  }
+  .button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-xl border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:enabled:border-accent hover:enabled:text-accent disabled:opacity-50;
+  }
+  .error-text {
+    @apply text-sm leading-6 text-danger;
+  }
+  .success-text {
+    @apply text-sm leading-6 text-accent;
+  }
+}

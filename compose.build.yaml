@@ -1,0 +1,22 @@
+# Local source builds: docker compose -f compose.yaml -f compose.build.yaml up -d --build
+services:
+  migrate:
+    image: ask-tools:latest
+    pull_policy: build
+    build:
+      context: .
+      target: tools
+
+  app:
+    image: ask-app:latest
+    pull_policy: build
+    build:
+      context: .
+      target: runner
+
+  tools:
+    image: ask-tools:latest
+    pull_policy: build
+    build:
+      context: .
+      target: tools
