@@ -492,6 +492,8 @@ test("shared answers follow publication changes and expose only public data", as
       {},
       headers,
       { "User-Agent": "facebookexternalhit/1.1" },
+      { "User-Agent": "Twitterbot/1.0" },
+      { "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)" },
       { RSC: "1" },
     ]) {
       // Next.js requires the RSC cache discriminator even for an empty header hash.
@@ -508,6 +510,11 @@ test("shared answers follow publication changes and expose only public data", as
       }
       for (const value of privateValues) assert.equal(body.includes(value), false);
     }
+    const image = await request(`${path}/og`);
+    assert.equal(image.status, 404);
+    assert.notEqual(image.headers.get("content-type"), "image/png");
+    const body = await image.text();
+    for (const value of privateValues) assert.equal(body.includes(value), false);
   }
 
   await unavailable("/questions/missing", []);
@@ -533,6 +540,8 @@ test("shared answers follow publication changes and expose only public data", as
     {},
     headers,
     { "User-Agent": "facebookexternalhit/1.1", "X-Forwarded-Host": "untrusted.example" },
+    { "User-Agent": "Twitterbot/1.0" },
+    { "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)" },
     { RSC: "1" },
   ]) {
     const url = "RSC" in customHeaders ? `${sharePath}?_rsc` : sharePath;
@@ -553,11 +562,29 @@ test("shared answers follow publication changes and expose only public data", as
         head.includes(`property="og:title" content="${content.replace(/\s+/g, " ")} | ASK"`),
       );
       assert.ok(
-        head.includes(`property="og:description" content="${answer.replace(/\s+/g, " ")}"`),
+        head.includes(`property="og:description" content="${content.replace(/\s+/g, " ")}"`),
       );
-      assert.ok(head.includes('name="twitter:card" content="summary"'));
+      assert.ok(head.includes(`property="og:image" content="${origin}${sharePath}/og"`));
+      assert.ok(head.includes('property="og:image:width" content="1200"'));
+      assert.ok(head.includes('property="og:image:height" content="630"'));
+      assert.ok(head.includes('name="twitter:card" content="summary_large_image"'));
+      assert.ok(head.includes(`name="twitter:image" content="${origin}${sharePath}/og"`));
       assert.equal(head.includes("untrusted.example"), false);
     }
+  }
+
+  for (const bot of ["Twitterbot/1.0", "Discordbot/2.0"]) {
+    const response = await request(`${sharePath}/og`, "GET", undefined, false, {
+      "User-Agent": bot,
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /image\/png/);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+    const png = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual(png.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    assert.equal(png.readUInt32BE(16), 1200);
+    assert.equal(png.readUInt32BE(20), 630);
+    assert.ok(png.length < 5 * 1024 * 1024);
   }
 
   for (const status of ["PENDING", "ARCHIVED"] as const) {

@@ -1,40 +1,48 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { cache } from "react";
 import { PublicAnswer } from "@/components/public-answer";
 import { getAuthSettings } from "@/lib/env";
-import { getPrisma } from "@/lib/prisma";
+import { getPublicQuestion } from "@/lib/public-question";
 import { getQuestionPath } from "@/lib/question-link";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-// Deduplicate within a request only; always recheck visibility on the next request.
-const getPublicQuestion = cache(async (id: string) => {
-  const question = await getPrisma().question.findUnique({
-    where: { id, status: "PUBLISHED", answer: { not: null } },
-    select: { id: true, content: true, answer: true, publishedAt: true },
-  });
-  if (!question?.answer?.trim()) notFound();
-  return { ...question, answer: question.answer };
-});
 
 export async function generateMetadata({
   params,
 }: PageProps<"/questions/[id]">): Promise<Metadata> {
   const { id } = await params;
   const question = await getPublicQuestion(id);
-  const title = `${question.content.replace(/\s+/g, " ").slice(0, 80)} | ASK`;
-  const description = question.answer.replace(/\s+/g, " ").slice(0, 160);
+  const description = question.content.replace(/\s+/g, " ").trim();
+  const characters = Array.from(description);
+  const title = `${characters.slice(0, 64).join("")} | ASK`;
   const url = new URL(getQuestionPath(question.id), getAuthSettings().baseURL).href;
+  const image = {
+    url: `${url}/og`,
+    width: 1200,
+    height: 630,
+    alt: characters.slice(0, 420).join(""),
+  };
 
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, siteName: "ASK", locale: "ko_KR", type: "article" },
-    twitter: { card: "summary", title, description },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: "ASK",
+      locale: "ko_KR",
+      type: "article",
+      images: [image],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: characters.slice(0, 200).join(""),
+      images: [image],
+    },
   };
 }
 
