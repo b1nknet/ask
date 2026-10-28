@@ -19,6 +19,7 @@ export async function GET(_request: Request, { params }: RouteContext<"/question
       style={{
         display: "flex",
         flexDirection: "column",
+        justifyContent: "center",
         width: "100%",
         height: "100%",
         padding: "56px 64px",
@@ -29,36 +30,12 @@ export async function GET(_request: Request, { params }: RouteContext<"/question
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingBottom: 24,
-          borderBottom: "1px solid #484848",
+          fontSize: text.length > 80 ? 40 : 52,
+          lineHeight: 1.4,
+          wordBreak: "break-all",
         }}
       >
-        <span style={{ color: "#c8b4f0", fontSize: 36 }}>ASK</span>
-        <span style={{ color: "#b3afb9", fontSize: 24 }}>익명 질문</span>
-      </div>
-      <div
-        style={{
-          display: "flex",
-          flex: 1,
-          alignItems: "center",
-          padding: "24px 0",
-        }}
-      >
-        <div
-          style={{
-            fontSize: text.length > 80 ? 40 : 52,
-            lineHeight: 1.4,
-            wordBreak: "break-all",
-          }}
-        >
-          {preview}
-        </div>
-      </div>
-      <div style={{ display: "flex", color: "#c8b4f0", fontSize: 24 }}>
-        질문과 답변을 확인해 보세요.
+        {preview}
       </div>
     </div>,
     {
