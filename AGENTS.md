@@ -18,6 +18,8 @@ changes.
 
 ## Branch Workflow
 
+- Create a new branch only when the user explicitly requests it. Otherwise, work on the current
+  branch. The workflow below does not authorize creating a branch without that explicit request.
 - `main`: deployment branch; merge ordinary changes through PRs.
 - `develop`: development integration branch.
 - `feature/*`, `docs/*`, `refactoring/*`, `fix/*`, `chore/*`: branch from `develop`, implement and
