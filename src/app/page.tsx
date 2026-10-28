@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { QuestionForm } from "@/components/question-form";
 import { Icon } from "@/components/icon";
+import { PublicAnswer } from "@/components/public-answer";
 import { getPrisma } from "@/lib/prisma";
 import { hasAdmin } from "@/lib/setup";
 
@@ -42,22 +43,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         ) : (
           <div className="space-y-5">
             {questions.slice(0, pageSize).map((question) => (
-              <article key={question.id} className="card">
-                <h3 className="whitespace-pre-wrap break-words text-lg font-semibold leading-8">
-                  {question.content}
-                </h3>
-                <p className="mt-5 whitespace-pre-wrap break-words border-l-2 border-accent pl-4 text-sm leading-7 text-muted">
-                  {question.answer}
-                </p>
-                {question.publishedAt && (
-                  <time
-                    dateTime={question.publishedAt.toISOString()}
-                    className="mt-5 block text-xs text-subtle"
-                  >
-                    {question.publishedAt.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}
-                  </time>
-                )}
-              </article>
+              <PublicAnswer key={question.id} question={question} />
             ))}
           </div>
         )}
