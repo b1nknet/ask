@@ -465,6 +465,159 @@ test("anonymous inbox enforces authentication, moderation, and privacy", async (
   assert.equal((await request(endpoint, "DELETE", undefined, true)).status, 401);
 });
 
+test("shared answers follow publication changes and expose only public data", async () => {
+  const login = await request("/api/auth/sign-in/username", "POST", {
+    username: "second_admin",
+    password: secondAdminPassword,
+  });
+  assert.equal(login.status, 200);
+  const headers = {
+    Cookie: login.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; "),
+  };
+  const content = `공유 질문 ${randomBytes(12).toString("hex")}\n두 번째 줄`;
+  const draft = "외부에 공개하면 안 되는 임시 답변";
+  const ipAddress = "203.0.113.77";
+  const question = await getPrisma().question.create({
+    data: { content, answer: draft, ipAddress },
+  });
+  const sharePath = `/questions/${question.id}`;
+  const endpoint = `/api/admin/questions/${question.id}`;
+  const answer = "링크로 공유한 답변입니다.\n줄바꿈도 유지해요.";
+
+  async function unavailable(path: string, privateValues: string[]) {
+    for (const customHeaders of [
+      {},
+      headers,
+      { "User-Agent": "facebookexternalhit/1.1" },
+      { "User-Agent": "Twitterbot/1.0" },
+      { "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)" },
+      { RSC: "1" },
+    ]) {
+      // Next.js requires the RSC cache discriminator even for an empty header hash.
+      const url = "RSC" in customHeaders ? `${path}?_rsc` : path;
+      const response = await request(url, "GET", undefined, false, customHeaders);
+      const body = await response.text();
+      if ("RSC" in customHeaders) {
+        // A streamed RSC not-found result can retain HTTP 200 after headers are sent.
+        assert.ok([200, 404].includes(response.status));
+        assert.match(response.headers.get("content-type") ?? "", /text\/x-component/);
+        assert.match(body, /NEXT_HTTP_ERROR_FALLBACK;404/);
+      } else {
+        assert.equal(response.status, 404);
+      }
+      for (const value of privateValues) assert.equal(body.includes(value), false);
+    }
+    const image = await request(`${path}/og`);
+    assert.equal(image.status, 404);
+    assert.notEqual(image.headers.get("content-type"), "image/png");
+    const body = await image.text();
+    for (const value of privateValues) assert.equal(body.includes(value), false);
+  }
+
+  await unavailable("/questions/missing", []);
+  await unavailable(sharePath, [content.split("\n")[0], draft, ipAddress]);
+  const published = await request(
+    endpoint,
+    "PATCH",
+    { answer, status: "PUBLISHED" },
+    false,
+    headers,
+  );
+  assert.equal(published.status, 200);
+  assert.deepEqual(await published.json(), { success: true, sharePath });
+
+  assert.ok((await (await request("/")).text()).includes(`href="${sharePath}"`));
+  const admin = await (
+    await request("/admin?status=PUBLISHED", "GET", undefined, false, headers)
+  ).text();
+  assert.ok(admin.includes(`href="${sharePath}"`));
+  assert.ok(admin.includes("링크 복사"));
+
+  for (const customHeaders of [
+    {},
+    headers,
+    { "User-Agent": "facebookexternalhit/1.1", "X-Forwarded-Host": "untrusted.example" },
+    { "User-Agent": "Twitterbot/1.0" },
+    { "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)" },
+    { RSC: "1" },
+  ]) {
+    const url = "RSC" in customHeaders ? `${sharePath}?_rsc` : sharePath;
+    const response = await request(url, "GET", undefined, false, customHeaders);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+    const body = await response.text();
+    assert.ok(body.includes(content.split("\n")[0]));
+    assert.ok(body.includes(answer.split("\n")[0]));
+    for (const value of [draft, ipAddress, "ipAddress", "질문자 IP:"]) {
+      assert.equal(body.includes(value), false);
+    }
+    if ("User-Agent" in customHeaders) {
+      const head = body.split("</head>")[0];
+      assert.ok(head.includes(`<link rel="canonical" href="${origin}${sharePath}"`));
+      assert.ok(head.includes(`property="og:url" content="${origin}${sharePath}"`));
+      assert.ok(
+        head.includes(`property="og:title" content="${content.replace(/\s+/g, " ")} | ASK"`),
+      );
+      assert.ok(
+        head.includes(`property="og:description" content="${content.replace(/\s+/g, " ")}"`),
+      );
+      assert.ok(head.includes(`property="og:image" content="${origin}${sharePath}/og"`));
+      assert.ok(head.includes('property="og:image:width" content="1200"'));
+      assert.ok(head.includes('property="og:image:height" content="630"'));
+      assert.ok(head.includes('name="twitter:card" content="summary_large_image"'));
+      assert.ok(head.includes(`name="twitter:image" content="${origin}${sharePath}/og"`));
+      assert.equal(head.includes("untrusted.example"), false);
+    }
+  }
+
+  for (const bot of ["Twitterbot/1.0", "Discordbot/2.0"]) {
+    const response = await request(`${sharePath}/og`, "GET", undefined, false, {
+      "User-Agent": bot,
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type") ?? "", /image\/png/);
+    assert.match(response.headers.get("cache-control") ?? "", /no-store/);
+    const png = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual(png.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    assert.equal(png.readUInt32BE(16), 1200);
+    assert.equal(png.readUInt32BE(20), 630);
+    assert.ok(png.length < 5 * 1024 * 1024);
+  }
+
+  for (const status of ["PENDING", "ARCHIVED"] as const) {
+    const hidden = await request(endpoint, "PATCH", { answer: draft, status }, false, headers);
+    assert.equal(hidden.status, 200);
+    assert.deepEqual(await hidden.json(), { success: true, sharePath: null });
+    await unavailable(sharePath, [content.split("\n")[0], draft, answer.split("\n")[0], ipAddress]);
+    const republished = await request(
+      endpoint,
+      "PATCH",
+      { answer, status: "PUBLISHED" },
+      false,
+      headers,
+    );
+    assert.deepEqual(await republished.json(), { success: true, sharePath });
+    assert.equal((await request(sharePath)).status, 200);
+  }
+
+  const updated = "수정한 답변도 같은 주소에 표시됩니다.";
+  await request(endpoint, "PATCH", { answer: updated, status: "PUBLISHED" }, false, headers);
+  const updatedPage = await (await request(sharePath)).text();
+  assert.ok(updatedPage.includes(updated));
+  assert.equal(updatedPage.includes(answer.split("\n")[0]), false);
+
+  // Even malformed legacy records cannot expose a question without a usable answer.
+  for (const empty of [null, "", "   "]) {
+    await getPrisma().question.update({ where: { id: question.id }, data: { answer: empty } });
+    await unavailable(sharePath, [content.split("\n")[0], ipAddress]);
+  }
+  assert.equal((await request(endpoint, "DELETE", undefined, false, headers)).status, 200);
+  await unavailable(sharePath, [content.split("\n")[0], updated, ipAddress]);
+});
+
 test("question submissions store IPv6 and leave unavailable addresses empty", async () => {
   for (const [header, expected] of [
     ["2001:db8::42", "2001:db8::42"],

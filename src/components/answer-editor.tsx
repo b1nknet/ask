@@ -2,7 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ShareLink } from "@/components/share-link";
 import type { QuestionStatus } from "@/generated/prisma/client";
+import { getQuestionPath } from "@/lib/question-link";
 
 type Question = {
   id: string;
@@ -17,6 +20,11 @@ export function AnswerEditor({ question }: { question: Question }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<{ error: boolean; message: string } | null>(null);
+  const [sharePath, setSharePath] = useState<string | null>(
+    question.status === "PUBLISHED" && question.answer?.trim()
+      ? getQuestionPath(question.id)
+      : null,
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,10 +41,20 @@ export function AnswerEditor({ question }: { question: Question }) {
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined,
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as { error?: string; sharePath?: string | null };
       if (!response.ok) throw new Error(result.error ?? "저장하지 못했어요.");
-      setNotice({ error: false, message: method === "DELETE" ? "삭제했어요." : "저장했어요." });
-      router.refresh();
+      setSharePath(result.sharePath ?? null);
+      setNotice({
+        error: false,
+        message:
+          method === "DELETE"
+            ? "삭제했어요."
+            : result.sharePath
+              ? "공개했어요. 아래에서 링크를 복사할 수 있어요."
+              : "저장했어요.",
+      });
+      // Keep the saved card visible so its link can be copied immediately after publishing.
+      if (method === "DELETE") router.refresh();
     } catch (error) {
       setNotice({
         error: true,
@@ -114,6 +132,14 @@ export function AnswerEditor({ question }: { question: Question }) {
           </button>
         </div>
       </form>
+      {sharePath && (
+        <div className="mt-5 space-y-3 border-t border-line pt-5">
+          <Link href={sharePath} className="text-link inline-flex min-h-11 items-center text-sm">
+            공개 답변 보기 →
+          </Link>
+          <ShareLink path={sharePath} />
+        </div>
+      )}
     </article>
   );
 }

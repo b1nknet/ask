@@ -1,6 +1,7 @@
 import { getAdminSession } from "@/lib/auth";
 import { handleError, json, readJson, requireSameOrigin } from "@/lib/http";
 import { getPrisma } from "@/lib/prisma";
+import { getQuestionPath } from "@/lib/question-link";
 import { answerSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -33,7 +34,10 @@ export async function PATCH(request: Request, { params }: Context) {
       },
     });
 
-    return json({ success: true });
+    return json({
+      success: true,
+      sharePath: parsed.data.status === "PUBLISHED" ? getQuestionPath(id) : null,
+    });
   } catch (error) {
     return handleError(error);
   }
