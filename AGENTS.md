@@ -10,6 +10,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Commit & Pull Request Guidelines
 
+Create or publish a pull request (including a draft PR) only when the user explicitly requests it.
+The branch workflow below does not authorize creating or publishing a PR without that explicit request.
+
 Use Conventional Commits: `<type>: <summary>` (`feat`, `fix`, `docs`, `chore`, `build`).
 Prefer concise Korean summaries, e.g. `feat: 다크 모드 추가`. Scopes are optional (`feat(ci): ...`). Keep
 commits focused. PRs should explain behavior changes, link issues, report validation results, and
